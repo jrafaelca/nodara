@@ -82,51 +82,42 @@ export function NavMain({ items }) {
   }, {})
 
   return Object.entries(sections).map(([section, sectionItems]) => (
-    <Collapsible key={section} defaultOpen className="group/section">
-      <SidebarGroup>
-        {section === "Operations" && (
-          <SidebarGroupContent className="flex flex-col gap-2">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton
-                      tooltip="Quick Actions"
-                      className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground">
-                      <CirclePlus />
-                      <span>Quick Actions</span>
-                      <ChevronDown className="ml-auto" />
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="right" align="start" className="min-w-48">
-                    <DropdownMenuItem asChild>
-                      <a href="/hosts/new">
-                        <Server />
-                        Add host
-                      </a>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <a href="/settings/roles/new">
-                        <ShieldPlus />
-                        Add role
-                      </a>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        )}
-        <SidebarGroupLabel asChild>
-          <CollapsibleTrigger className="w-full cursor-pointer">
-            <span>{section}</span>
-            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/section:rotate-90" />
-          </CollapsibleTrigger>
-        </SidebarGroupLabel>
-        <CollapsibleContent>
-          <NavItems items={sectionItems} />
-        </CollapsibleContent>
-      </SidebarGroup>
-    </Collapsible>
+    <SidebarGroup key={section}>
+      {section === "Operations" && (
+        <SidebarGroupContent className="flex flex-col gap-2">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip="Quick Actions"
+                    className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground">
+                    <CirclePlus />
+                    <span>Quick Actions</span>
+                    <ChevronDown className="ml-auto" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right" align="start" className="min-w-48">
+                  <DropdownMenuItem asChild>
+                    <a href="/hosts/new">
+                      <Server />
+                      Add host
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a href="/settings/roles/new">
+                      <ShieldPlus />
+                      Add role
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      )}
+      <SidebarGroupLabel>{section}</SidebarGroupLabel>
+      <NavItems items={sectionItems} />
+    </SidebarGroup>
   ))
 }
