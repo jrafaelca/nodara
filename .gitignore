@@ -1,0 +1,19 @@
+/spec/
+
+# Local development files
+.env
+.env.*
+!.env.example
+
+# Build outputs
+/bin/
+/dist/
+
+# Frontend dependencies
+node_modules/
+
+# Local databases and runtime data
+*.db
+*.db-shm
+*.db-wal
+/.data/
