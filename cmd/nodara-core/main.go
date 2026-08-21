@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -35,6 +36,11 @@ type config struct {
 	TLSKeyFile    string
 	TLSCAFile     string
 	StaleAfter    time.Duration
+	PublicURL     string
+	CookieSecure  bool
+	ResetDelivery string
+	SMTPURL       string
+	SMTPFrom      string
 }
 
 func main() {
@@ -82,7 +88,7 @@ func main() {
 		}
 	}()
 
-	httpServer := &http.Server{Addr: cfg.HTTPAddr, Handler: httpHandler(store, hub, logger), ReadHeaderTimeout: 5 * time.Second}
+	httpServer := &http.Server{Addr: cfg.HTTPAddr, Handler: httpHandler(store, hub, logger, authService, cfg), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		logger.Info("http_started", "component", "core", "event", "http_started", "addr", cfg.HTTPAddr)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -100,8 +106,9 @@ func main() {
 	_ = httpServer.Shutdown(shutdownCtx)
 }
 
-func httpHandler(store *storage.Store, hub *websocket.Hub, logger *slog.Logger) http.Handler {
+func httpHandler(store *storage.Store, hub *websocket.Hub, logger *slog.Logger, authService *auth.Service, cfg config) http.Handler {
 	mux := http.NewServeMux()
+	authHTTP := auth.NewHTTP(authService, logger, cfg.PublicURL, cfg.CookieSecure, cfg.ResetDelivery, cfg.SMTPURL, cfg.SMTPFrom)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ok\n")
@@ -114,7 +121,8 @@ func httpHandler(store *storage.Store, hub *websocket.Hub, logger *slog.Logger) 
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, "ready\n")
 	})
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/api/auth/", authHTTP)
+	mux.Handle("/ws", authHTTP.RequireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		agents, err := store.ListAgents(r.Context())
 		if err != nil {
 			logger.Error("snapshot_failed", "component", "core", "event", "snapshot_failed", "error", err)
@@ -122,7 +130,7 @@ func httpHandler(store *storage.Store, hub *websocket.Hub, logger *slog.Logger) 
 			return
 		}
 		hub.ServeHTTP(w, r, control.AgentEvent{Type: "agent.snapshot", OccurredAt: time.Now().UTC(), Agents: agents})
-	})
+	}), false))
 	return mux
 }
 
@@ -139,12 +147,23 @@ func loadConfig() (config, error) {
 		TLSCertFile:   env("NODARA_TLS_CERT_FILE", "/certs/server.crt"),
 		TLSKeyFile:    env("NODARA_TLS_KEY_FILE", "/certs/server.key"),
 		TLSCAFile:     env("NODARA_TLS_CA_FILE", "/certs/ca.crt"),
+		PublicURL:     env("PUBLIC_URL", "http://localhost:5173"),
+		CookieSecure:  envBool("COOKIE_SECURE", false),
+		ResetDelivery: env("PASSWORD_RESET_DELIVERY", "log"),
+		SMTPURL:       env("SMTP_URL", ""),
+		SMTPFrom:      env("SMTP_FROM", ""),
 	}
 	stale, err := time.ParseDuration(env("NODARA_STALE_AFTER", "15s"))
 	if err != nil || stale <= 0 {
 		return config{}, fmt.Errorf("invalid NODARA_STALE_AFTER")
 	}
 	cfg.StaleAfter = stale
+	if cfg.ResetDelivery != "log" && cfg.ResetDelivery != "smtp" {
+		return config{}, fmt.Errorf("PASSWORD_RESET_DELIVERY must be log or smtp")
+	}
+	if cfg.ResetDelivery == "smtp" && (cfg.SMTPURL == "" || cfg.SMTPFrom == "") {
+		return config{}, fmt.Errorf("SMTP_URL and SMTP_FROM are required when PASSWORD_RESET_DELIVERY=smtp")
+	}
 	return cfg, nil
 }
 
@@ -173,4 +192,16 @@ func env(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
