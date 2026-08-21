@@ -30,6 +30,9 @@ services:
       NODARA_TLS_KEY_FILE: /certs/server.key
       NODARA_TLS_CA_FILE: /certs/ca.crt
       NODARA_STALE_AFTER: 15s
+      PUBLIC_URL: http://localhost:5173
+      COOKIE_SECURE: "false"
+      PASSWORD_RESET_DELIVERY: log
     ports:
       - "8080:8080"
       - "9090:9090"
@@ -68,7 +71,7 @@ services:
       context: ../../web
       dockerfile: Dockerfile
     environment:
-      VITE_CORE_WS_URL: ws://localhost:8080/ws
+      VITE_CORE_URL: http://nodara-core:8080
     command: ["sh", "-c", "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
     ports:
       - "${NODARA_WEB_PORT:-5173}:5173"
