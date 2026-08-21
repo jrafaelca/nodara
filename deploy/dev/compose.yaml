@@ -69,11 +69,16 @@ services:
       dockerfile: Dockerfile
     environment:
       VITE_CORE_WS_URL: ws://localhost:8080/ws
+    command: ["sh", "-c", "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
     ports:
       - "${NODARA_WEB_PORT:-5173}:5173"
+    volumes:
+      - ../../web:/app
+      - web-node-modules:/app/node_modules
     depends_on:
       - nodara-core
 
 volumes:
   postgres-data:
   dev-certs:
+  web-node-modules:
