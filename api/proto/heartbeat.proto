@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package nodara.agent.v1;
+
+option go_package = "github.com/jrafaelca/nodara/api/heartbeat";
+
+service AgentHeartbeat {
+  rpc Stream(stream AgentMessage) returns (stream ServerMessage);
+}
+
+message AgentMessage {
+  Heartbeat heartbeat = 1;
+}
+
+message Heartbeat {
+  string agent_id = 1;
+  string hostname = 2;
+  string agent_version = 3;
+  string sent_at = 4;
+  uint64 sequence = 5;
+  repeated string capabilities = 6;
+}
+
+message ServerMessage {
+  HeartbeatAck heartbeat_ack = 1;
+}
+
+message HeartbeatAck {
+  string received_at = 1;
+  uint64 sequence = 2;
+}

@@ -1,0 +1,79 @@
+services:
+  postgres:
+    container_name: nodara-postgres
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nodara}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nodara}
+      POSTGRES_DB: ${POSTGRES_DB:-nodara}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nodara} -d ${POSTGRES_DB:-nodara}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+  nodara-core:
+    container_name: nodara-core
+    image: nodara-core:local
+    build:
+      context: ../..
+      dockerfile: deploy/dev/Dockerfile
+    command: ["sh", "-c", "/usr/local/bin/dev-certs.sh /certs && exec /usr/local/bin/nodara-core"]
+    environment:
+      NODARA_HTTP_ADDR: :8080
+      NODARA_GRPC_ADDR: :9090
+      NODARA_DATABASE_URL: postgres://${POSTGRES_USER:-nodara}:${POSTGRES_PASSWORD:-nodara}@postgres:5432/${POSTGRES_DB:-nodara}?sslmode=disable
+      NODARA_MIGRATIONS_DIR: /app/db/migrations
+      NODARA_TLS_CERT_FILE: /certs/server.crt
+      NODARA_TLS_KEY_FILE: /certs/server.key
+      NODARA_TLS_CA_FILE: /certs/ca.crt
+      NODARA_STALE_AFTER: 15s
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    volumes:
+      - dev-certs:/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nodara-agent:
+    container_name: nodara-agent
+    image: nodara-agent:local
+    build:
+      context: ../..
+      dockerfile: deploy/dev/Dockerfile
+    command: ["sh", "-c", "until [ -f /certs/agent.crt ]; do sleep 1; done; exec /usr/local/bin/nodara-agent"]
+    environment:
+      NODARA_CORE_ADDR: nodara-core:9090
+      NODARA_TLS_SERVER_NAME: nodara-core
+      NODARA_AGENT_ID: agent-local
+      NODARA_AGENT_HOSTNAME: demo-host
+      NODARA_AGENT_VERSION: 0.1.0-dev
+      NODARA_TLS_CERT_FILE: /certs/agent.crt
+      NODARA_TLS_KEY_FILE: /certs/agent.key
+      NODARA_TLS_CA_FILE: /certs/ca.crt
+      NODARA_HEARTBEAT_INTERVAL: 5s
+    volumes:
+      - dev-certs:/certs:ro
+    depends_on:
+      - nodara-core
+
+  nodara-web:
+    container_name: nodara-web
+    image: nodara-web:local
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+    environment:
+      VITE_CORE_WS_URL: ws://localhost:8080/ws
+    ports:
+      - "${NODARA_WEB_PORT:-5173}:5173"
+    depends_on:
+      - nodara-core
+
+volumes:
+  postgres-data:
+  dev-certs:
