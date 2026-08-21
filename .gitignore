@@ -5,15 +5,38 @@
 .env.*
 !.env.example
 
+# Secrets and credentials
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+secrets/
+
+# Local runtime data and volumes
+/.data/
+/data/
+/volumes/
+/exports/
+/backups/
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
 # Build outputs
 /bin/
 /dist/
+/build/
+/coverage/
 
 # Frontend dependencies
 node_modules/
 
 # Local databases and runtime data
-*.db
-*.db-shm
-*.db-wal
-/.data/
+
+# Generated API and frontend artifacts
+/api/gen/
+/web/dist/
