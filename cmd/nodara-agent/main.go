@@ -45,10 +45,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	sequence := uint64(0)
+	reconnectDelay := 2 * time.Second
 	for {
 		if err := runStream(ctx, cfg, tlsConfig, logger, &sequence); err != nil && ctx.Err() == nil {
 			logger.Error("stream_failed", "component", "agent", "event", "stream_failed", "error", err)
-			timer := time.NewTimer(2 * time.Second)
+			logger.Warn("reconnect_scheduled", "component", "agent", "event", "reconnect_scheduled", "delay", reconnectDelay)
+			timer := time.NewTimer(reconnectDelay)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
@@ -62,7 +64,9 @@ func main() {
 }
 
 func runStream(ctx context.Context, cfg config, tlsConfig *tls.Config, logger *slog.Logger, sequence *uint64) error {
-	conn, err := grpc.DialContext(ctx, cfg.ServerAddr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)), grpc.WithDefaultCallOptions(grpc.ForceCodec(grpcjson.Codec{})), grpc.WithBlock())
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	conn, err := grpc.DialContext(dialCtx, cfg.ServerAddr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)), grpc.WithDefaultCallOptions(grpc.ForceCodec(grpcjson.Codec{})), grpc.WithBlock())
 	if err != nil {
 		return fmt.Errorf("dial core: %w", err)
 	}
