@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log/slog"
+	"math/rand"
 	"os"
 	"os/signal"
 	"strings"
@@ -47,14 +48,24 @@ func main() {
 	sequence := uint64(0)
 	reconnectDelay := 2 * time.Second
 	for {
-		if err := runStream(ctx, cfg, tlsConfig, logger, &sequence); err != nil && ctx.Err() == nil {
+		connected, err := runStream(ctx, cfg, tlsConfig, logger, &sequence)
+		if err != nil && ctx.Err() == nil {
 			logger.Error("stream_failed", "component", "agent", "event", "stream_failed", "error", err)
-			logger.Warn("reconnect_scheduled", "component", "agent", "event", "reconnect_scheduled", "delay", reconnectDelay)
-			timer := time.NewTimer(reconnectDelay)
+			delay := jitter(reconnectDelay)
+			logger.Warn("reconnect_scheduled", "component", "agent", "event", "reconnect_scheduled", "delay", delay, "backoff", reconnectDelay)
+			timer := time.NewTimer(delay)
 			select {
 			case <-ctx.Done():
 				timer.Stop()
 			case <-timer.C:
+			}
+			if connected {
+				reconnectDelay = 2 * time.Second
+			} else if reconnectDelay < 30*time.Second {
+				reconnectDelay *= 2
+				if reconnectDelay > 30*time.Second {
+					reconnectDelay = 30 * time.Second
+				}
 			}
 		}
 		if ctx.Err() != nil {
@@ -63,18 +74,18 @@ func main() {
 	}
 }
 
-func runStream(ctx context.Context, cfg config, tlsConfig *tls.Config, logger *slog.Logger, sequence *uint64) error {
+func runStream(ctx context.Context, cfg config, tlsConfig *tls.Config, logger *slog.Logger, sequence *uint64) (bool, error) {
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	conn, err := grpc.DialContext(dialCtx, cfg.ServerAddr, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)), grpc.WithDefaultCallOptions(grpc.ForceCodec(grpcjson.Codec{})), grpc.WithBlock())
 	if err != nil {
-		return fmt.Errorf("dial core: %w", err)
+		return false, fmt.Errorf("dial core: %w", err)
 	}
 	defer conn.Close()
 	client := heartbeat.NewAgentHeartbeatClient(conn)
 	stream, err := client.Stream(ctx)
 	if err != nil {
-		return fmt.Errorf("open heartbeat stream: %w", err)
+		return true, fmt.Errorf("open heartbeat stream: %w", err)
 	}
 	logger.Info("connected", "component", "agent", "event", "connected", "agent_id", cfg.AgentID, "server", cfg.ServerAddr)
 	ticker := time.NewTicker(cfg.Interval)
@@ -82,20 +93,28 @@ func runStream(ctx context.Context, cfg config, tlsConfig *tls.Config, logger *s
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return true, ctx.Err()
 		case now := <-ticker.C:
 			(*sequence)++
 			message := &heartbeat.AgentMessage{Heartbeat: &heartbeat.Heartbeat{AgentID: cfg.AgentID, Hostname: cfg.Hostname, AgentVersion: cfg.Version, SentAt: now.UTC().Format(time.RFC3339Nano), Sequence: *sequence, Capabilities: []string{"heartbeat"}}}
 			if err := stream.Send(message); err != nil {
-				return fmt.Errorf("send heartbeat: %w", err)
+				return true, fmt.Errorf("send heartbeat: %w", err)
 			}
 			ack, err := stream.Recv()
 			if err != nil {
-				return fmt.Errorf("receive heartbeat ack: %w", err)
+				return true, fmt.Errorf("receive heartbeat ack: %w", err)
 			}
 			logger.Info("heartbeat_sent", "component", "agent", "event", "heartbeat_sent", "agent_id", cfg.AgentID, "sequence", ack.HeartbeatAck.Sequence)
 		}
 	}
+}
+
+func jitter(base time.Duration) time.Duration {
+	span := int64(float64(base) * 0.20)
+	if span == 0 {
+		return base
+	}
+	return base - time.Duration(span) + time.Duration(rand.Int63n(2*span+1))
 }
 
 func loadConfig() (config, error) {
