@@ -117,14 +117,12 @@ export function NavMain({ items }) {
             </SidebarMenu>
           </SidebarGroupContent>
         )}
-        <CollapsibleTrigger asChild>
-          <SidebarGroupLabel asChild>
-            <button className="w-full cursor-pointer">
-              <span>{section}</span>
-              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/section:rotate-90" />
-            </button>
-          </SidebarGroupLabel>
-        </CollapsibleTrigger>
+        <SidebarGroupLabel asChild>
+          <CollapsibleTrigger className="w-full cursor-pointer">
+            <span>{section}</span>
+            <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/section:rotate-90" />
+          </CollapsibleTrigger>
+        </SidebarGroupLabel>
         <CollapsibleContent>
           <NavItems items={sectionItems} />
         </CollapsibleContent>
