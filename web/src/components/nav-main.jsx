@@ -84,7 +84,7 @@ export function NavMain({ items }) {
   return Object.entries(sections).map(([section, sectionItems]) => (
     <SidebarGroup key={section}>
       {section === "Operations" && (
-        <SidebarGroupContent className="flex flex-col gap-2">
+        <SidebarGroupContent className="flex flex-col gap-2 pb-2">
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
