@@ -12,11 +12,14 @@ import { Input } from "@/components/ui/input"
 
 export function LoginForm({
   className,
+  onSubmit,
+  error,
+  loading,
   ...props
 }) {
   return (
     <div className={cn("flex flex-col gap-6 text-white", className)} {...props}>
-      <form>
+      <form onSubmit={onSubmit}>
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
             <a href="#" className="flex flex-col items-center gap-2 font-medium">
@@ -32,21 +35,22 @@ export function LoginForm({
           </div>
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
-            <Input className="border-white/20 text-white placeholder:text-white/40 focus-visible:border-white focus-visible:ring-white/30" id="email" type="email" placeholder="john.doe@example.com" required />
+            <Input className="border-white/20 text-white placeholder:text-white/40 focus-visible:border-white focus-visible:ring-white/30" id="identifier" name="identifier" autoComplete="username" placeholder="admin@nodara.dev" required />
           </Field>
           <Field>
             <div className="flex items-center">
               <FieldLabel htmlFor="password">Password</FieldLabel>
               <a
-                href="#"
+                href="/forgot-password"
                 className="ml-auto text-sm text-white/70 underline-offset-4 hover:text-white hover:underline">
                 Forgot your password?
               </a>
             </div>
-            <Input className="border-white/20 text-white placeholder:text-white/40 focus-visible:border-white focus-visible:ring-white/30" id="password" type="password" placeholder="••••••••" required />
+            <Input className="border-white/20 text-white placeholder:text-white/40 focus-visible:border-white focus-visible:ring-white/30" id="password" name="password" autoComplete="current-password" placeholder="••••••••" required />
           </Field>
+          {error && <p className="text-sm text-red-300">{error}</p>}
           <Field>
-            <Button className="bg-white text-black hover:bg-white/90" type="submit">Login</Button>
+            <Button className="bg-white text-black hover:bg-white/90" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Login'}</Button>
           </Field>
         </FieldGroup>
       </form>

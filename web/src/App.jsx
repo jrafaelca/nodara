@@ -1,90 +1,48 @@
-import React, { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { useAuth } from '@/lib/auth.jsx'
+import ChangePasswordPage from '@/pages/change-password.jsx'
 import DashboardPage from '@/pages/dashboard.jsx'
+import ForgotPasswordPage from '@/pages/forgot-password.jsx'
 import LoginPage from '@/pages/login.jsx'
-import { logfmt } from './log.js'
+import ResetPasswordPage from '@/pages/reset-password.jsx'
 
-const socketURL = import.meta.env.VITE_CORE_WS_URL || 'ws://localhost:8080/ws'
-
-function formatAge(date, now) {
-  if (!date) return 'nunca'
-  const seconds = Math.max(0, Math.floor((now - new Date(date).getTime()) / 1000))
-  return `${seconds}s`
+function LoadingScreen() {
+  return <main className="flex min-h-svh items-center justify-center bg-background text-sm text-muted-foreground">Loading console…</main>
 }
 
-function App() {
-  const [agents, setAgents] = useState([])
-  const [connected, setConnected] = useState(false)
-  const [lastEvent, setLastEvent] = useState(null)
-  const [now, setNow] = useState(Date.now())
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!user) return <Navigate to="/login" replace />
+  if (user.password_change_required) return <Navigate to="/change-password" replace />
+  return children
+}
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
+function GuestRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!user) return children
+  return <Navigate to={user.password_change_required ? '/change-password' : '/'} replace />
+}
 
-  useEffect(() => {
-    let socket
-    let retryTimer
-    let closed = false
+function ChangePasswordRoute() {
+  const { user, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!user) return <Navigate to="/login" replace />
+  return <ChangePasswordPage />
+}
 
-    const connect = () => {
-      socket = new WebSocket(socketURL)
-      socket.addEventListener('open', () => {
-        setConnected(true)
-        logfmt('INFO', 'websocket_connected', { url: socketURL })
-      })
-      socket.addEventListener('message', (message) => {
-        const event = JSON.parse(message.data)
-        setLastEvent(event)
-        if (event.type === 'agent.snapshot') {
-          setAgents(event.agents || [])
-        } else if (event.agent) {
-          setAgents((current) => {
-            const index = current.findIndex((agent) => agent.id === event.agent.id)
-            if (index < 0) return [...current, event.agent]
-            const next = [...current]
-            next[index] = event.agent
-            return next
-          })
-        }
-      })
-      socket.addEventListener('close', () => {
-        setConnected(false)
-        logfmt('WARN', 'websocket_disconnected', { url: socketURL })
-        if (!closed) retryTimer = window.setTimeout(connect, 2000)
-      })
-      socket.addEventListener('error', () => logfmt('ERROR', 'websocket_error', { url: socketURL }))
-    }
-
-    connect()
-    return () => {
-      closed = true
-      window.clearTimeout(retryTimer)
-      socket?.close()
-    }
-  }, [])
-
-  const healthy = useMemo(() => agents.filter((agent) => agent.status === 'healthy').length, [agents])
-  const tableData = useMemo(() => agents.map((agent, index) => ({
-    id: index + 1,
-    header: agent.name,
-    type: agent.hostname,
-    status: agent.status === 'healthy' ? 'Healthy' : 'Disconnected',
-    target: formatAge(agent.last_heartbeat_at, now),
-    limit: String(agent.sequence),
-    reviewer: agent.agent_version,
-  })), [agents, now])
-
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+        <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
+        <Route path="/reset-password" element={<GuestRoute><ResetPasswordPage /></GuestRoute>} />
+        <Route path="/change-password" element={<ChangePasswordRoute />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
 }
-
-export default App

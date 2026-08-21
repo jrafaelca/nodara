@@ -27,11 +27,6 @@ import {
 } from "@/components/ui/sidebar"
 
 const data = {
-  user: {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     { section: "Operations", title: "Overview", url: "/", icon: LayoutDashboard, status: "available" },
     { section: "Operations", title: "Hosts", url: "/hosts", icon: Server, status: "coming_soon" },
@@ -45,7 +40,7 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }) {
+export function AppSidebar({ user, onLogout, ...props }) {
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader>
@@ -70,7 +65,7 @@ export function AppSidebar({ ...props }) {
         <NavSecondary className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={{ name: user.username, email: user.email }} onLogout={onLogout} />
       </SidebarFooter>
     </Sidebar>
   );
