@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jrafaelca/nodara/api/heartbeat"
+	"github.com/jrafaelca/nodara/internal/auth"
 	"github.com/jrafaelca/nodara/internal/control"
 	"github.com/jrafaelca/nodara/internal/storage"
 	"github.com/jrafaelca/nodara/internal/transport/grpcjson"
@@ -52,6 +53,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer store.Close()
+	authService := &auth.Service{Store: store}
+	if err := authService.SeedAdmin(ctx); err != nil {
+		logger.Error("admin_seed_failed", "component", "core", "event", "admin_seed_failed", "error", err)
+		os.Exit(1)
+	}
 
 	tlsConfig, err := serverTLSConfig(cfg)
 	if err != nil {
